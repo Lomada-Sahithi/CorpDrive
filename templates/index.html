@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CorpDrive | Terminal v3.2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --brand: #6366f1; --bg: #0f172a; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg); color: #f8fafc; }
+        .glass { background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); }
+        .page { display: none; min-height: calc(100vh - 64px); }
+        .page.active { display: flex; }
+        .map-grid { background-color: #0f172a; background-image: linear-gradient(rgba(99, 102, 241, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(99, 102, 241, 0.05) 1px, transparent 1px); background-size: 30px 30px; }
+        .btn-primary { background: var(--brand); transition: all 0.3s ease; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.5); }
+        .sidebar-item { transition: all 0.2s; border-left: 3px solid transparent; cursor: pointer; }
+        .sidebar-item.active { background: rgba(99, 102, 241, 0.1); border-left-color: var(--brand); color: #818cf8; }
+        .route-line { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: draw 2s forwards ease-out; }
+        @keyframes draw { to { stroke-dashoffset: 0; } }
+        .node-dot { cursor: crosshair; transition: r 0.2s, filter 0.2s; }
+        .node-dot:hover { r: 5; filter: drop-shadow(0 0 8px currentColor) brightness(1.3); }
+        #editModal { display: none; }
+        #editModal.active { display: flex; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <div id="loginPage" class="fixed inset-0 z-[100] bg-[#020617] flex items-center justify-center p-6">
+        <div class="glass p-10 rounded-[3rem] w-full max-w-md text-center">
+            <div class="w-16 h-16 bg-indigo-600 rounded-2xl mx-auto mb-6 flex items-center justify-center text-3xl font-black italic text-white">C</div>
+            <h1 class="text-2xl font-bold mb-8">CorpDrive <span class="text-indigo-400">Auth</span></h1>
+            <input id="loginPass" type="password" placeholder="Password" class="w-full p-4 rounded-2xl bg-white/5 border border-white/10 outline-none mb-4 text-center">
+            <button onclick="handleLogin()" class="w-full btn-primary text-white py-4 rounded-2xl font-bold">Launch System</button>
+        </div>
+    </div>
+
+    <div id="editModal" class="fixed inset-0 z-[110] bg-black/70 backdrop-blur-md items-center justify-center p-6">
+        <div class="glass p-8 rounded-[2.5rem] w-full max-w-sm border-white/10 shadow-2xl">
+            <h3 id="modalTitle" class="text-xl font-bold mb-6 text-indigo-300 tracking-tight">Modify Unit</h3>
+            <div class="space-y-4">
+                <input id="modalID" type="text" placeholder="Unit ID" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl outline-none focus:border-indigo-500">
+                <input id="modalValue" type="text" placeholder="Value" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl outline-none focus:border-indigo-500">
+                <div class="flex gap-3 pt-4">
+                    <button onclick="closeModal()" class="flex-1 bg-white/5 py-3 rounded-xl font-bold text-xs opacity-60">Cancel</button>
+                    <button onclick="saveEdit()" class="flex-1 btn-primary py-3 rounded-xl font-bold text-xs">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <nav id="mainNav" class="hidden h-16 glass border-b border-white/5 px-8 flex items-center justify-between sticky top-0 z-50">
+        <div class="flex items-center gap-12">
+            <span class="text-xl font-black text-indigo-400 italic tracking-tighter">CORPDRIVE</span>
+            <div class="flex gap-1 h-full">
+                <button onclick="showPage('personnelPage')" class="sidebar-item active px-6 h-16 text-[10px] font-bold uppercase tracking-widest text-slate-400">Employees</button>
+                <button onclick="showPage('fleetPage')" class="sidebar-item px-6 h-16 text-[10px] font-bold uppercase tracking-widest text-slate-400">Fleet</button>
+                <button onclick="showPage('simPage')" class="sidebar-item px-6 h-16 text-[10px] font-bold uppercase tracking-widest text-slate-400">Live Terminal</button>
+            </div>
+        </div>
+        <button onclick="handleLogout()" class="text-slate-500 hover:text-red-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+    </nav>
+
+    <div id="personnelPage" class="page active p-8 flex-col gap-8 overflow-y-auto">
+        <div class="flex justify-between items-end">
+            <div><h2 class="text-4xl font-extrabold tracking-tight text-white">Employees <span class="text-indigo-400">Registry</span></h2></div>
+            <div class="glass p-3 rounded-2xl flex gap-2">
+                <input id="empID" type="text" placeholder="ID" class="bg-white/5 border border-white/10 p-3 rounded-xl text-sm w-28 outline-none focus:border-indigo-500">
+                <input id="empCoord" type="text" placeholder="X,Y" class="bg-white/5 border border-white/10 p-3 rounded-xl text-sm w-28 outline-none focus:border-indigo-500">
+                <button onclick="addEmployee()" class="btn-primary text-white px-6 py-3 rounded-xl font-bold text-sm">Register</button>
+            </div>
+        </div>
+        <div id="employeeList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+    </div>
+
+    <div id="fleetPage" class="page p-8 flex-col gap-8 overflow-y-auto">
+        <div class="flex justify-between items-end">
+            <div><h2 class="text-4xl font-extrabold tracking-tight text-white">Active <span class="text-emerald-400">Fleet</span></h2></div>
+            <div class="glass p-3 rounded-2xl flex gap-2">
+                <input id="carID" type="text" placeholder="Car ID" class="bg-white/5 border border-white/10 p-3 rounded-xl text-sm w-28 outline-none focus:border-emerald-500">
+                <input id="carCap" type="number" placeholder="Range" class="bg-white/5 border border-white/10 p-3 rounded-xl text-sm w-28 outline-none focus:border-emerald-500">
+                <button onclick="addCar()" class="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold text-sm">Add EV</button>
+            </div>
+        </div>
+        <div id="carList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+    </div>
+
+    <div id="simPage" class="page p-6 flex-row gap-6">
+        <div class="w-1/4 flex flex-col gap-6">
+            <button onclick="runSimulation()" class="btn-primary w-full py-8 rounded-[2.5rem] font-black text-xl uppercase tracking-tighter">Execute Dispatch</button>
+            <div id="unassignedAlert" class="hidden bg-red-500/10 border border-red-500/20 p-6 rounded-[2rem]"><h3 class="text-red-400 text-[10px] font-black uppercase mb-4 tracking-widest">⚠️ Unassigned Units</h3><div id="unassignedList" class="flex flex-wrap gap-2"></div></div>
+            <div class="flex-1 glass rounded-[2.5rem] p-6 overflow-hidden flex flex-col"><p class="text-[10px] font-black text-slate-500 uppercase mb-6 tracking-widest">Live Telemetry</p><div id="fleetStats" class="flex-1 overflow-y-auto space-y-4"></div></div>
+        </div>
+        <div class="flex-1 rounded-[3rem] border border-white/5 relative map-grid overflow-hidden"><svg id="mapCanvas" class="w-full h-full" viewBox="-120 -80 240 160"><g id="zoomLayer"><circle cx="0" cy="0" r="4" fill="#6366f1" class="animate-pulse"/><g id="drawLayer"></g></g></svg></div>
+    </div>
+
+    <script>
+        let employees = JSON.parse(localStorage.getItem('corp_employees')) || [{id:'E1', x:40, y:30}, {id:'E2', x:-50, y:20}];
+        let cars = JSON.parse(localStorage.getItem('corp_cars')) || [{id:'V1', cap:200}];
+        let curEditType = null, curEditIdx = null;
+
+        window.onload = () => { if (localStorage.getItem('corp_session') === 'active') { document.getElementById('loginPage').style.display = 'none'; document.getElementById('mainNav').classList.remove('hidden'); renderLists(); } };
+        function handleLogin() { if (document.getElementById('loginPass').value === "CorpDrive") { localStorage.setItem('corp_session', 'active'); location.reload(); } }
+        function handleLogout() { localStorage.removeItem('corp_session'); location.reload(); }
+        function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.querySelectorAll('.sidebar-item').forEach(l => l.classList.remove('active')); document.getElementById(id).classList.add('active'); event.currentTarget.classList.add('active'); }
+        function saveData() { localStorage.setItem('corp_employees', JSON.stringify(employees)); localStorage.setItem('corp_cars', JSON.stringify(cars)); }
+
+        // EDITING CORE
+        function openEdit(type, i) {
+            curEditType = type; curEditIdx = i;
+            const data = type === 'emp' ? employees[i] : cars[i];
+            document.getElementById('modalID').value = data.id;
+            document.getElementById('modalValue').value = type === 'emp' ? `${data.x},${data.y}` : data.cap;
+            document.getElementById('editModal').classList.add('active');
+        }
+        function closeModal() { document.getElementById('editModal').classList.remove('active'); }
+        function saveEdit() {
+            const id = document.getElementById('modalID').value;
+            const val = document.getElementById('modalValue').value;
+            if(curEditType === 'emp') { const c = val.split(','); employees[curEditIdx] = {id, x:parseFloat(c[0]), y:parseFloat(c[1])}; }
+            else { employees[curEditIdx] = {id, cap:parseFloat(val)}; }
+            saveData(); renderLists(); closeModal();
+        }
+
+        function addEmployee() { const id = document.getElementById('empID').value; const c = document.getElementById('empCoord').value.split(','); if(id&&c.length==2){ employees.push({id, x:parseFloat(c[0]), y:parseFloat(c[1])}); saveData(); renderLists(); } }
+        function addCar() { const id = document.getElementById('carID').value; const cap = parseFloat(document.getElementById('carCap').value); if(id&&cap){ cars.push({id, cap}); saveData(); renderLists(); } }
+
+        function renderLists() {
+            document.getElementById('employeeList').innerHTML = employees.map((e, i) => `<div class="glass p-6 rounded-[2rem] border-white/5 hover:border-indigo-500/50 transition-all"><div class="flex justify-between mb-4"><div class="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-bold">${e.id}</div><div class="flex gap-2"><button onclick="openEdit('emp',${i})" class="text-indigo-400 text-[9px] font-black uppercase">Edit</button><button onclick="employees.splice(${i},1);saveData();renderLists()" class="text-slate-600 text-[9px] font-black uppercase hover:text-red-400">Delete</button></div></div><p class="text-[9px] font-bold text-slate-500 uppercase mb-1">X, Y Pos</p><p class="text-lg font-mono font-bold text-slate-200">${e.x}, ${e.y}</p></div>`).join('');
+            document.getElementById('carList').innerHTML = cars.map((c, i) => `<div class="glass p-6 rounded-[2rem] border-b-4 border-emerald-500 hover:bg-white/5 transition-all"><div class="flex justify-between mb-4"><div class="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-bold">${c.id}</div><div class="flex gap-2"><button onclick="openEdit('car',${i})" class="text-emerald-400 text-[9px] font-black uppercase">Edit</button><button onclick="cars.splice(${i},1);saveData();renderLists()" class="text-slate-600 text-[9px] font-black uppercase hover:text-red-400">Retire</button></div></div><p class="text-[9px] font-bold text-slate-500 uppercase mb-1">Battery Payload</p><p class="text-lg font-mono font-bold text-slate-200">${c.cap} <span class="text-xs text-slate-500">KM</span></p></div>`).join('');
+        }
+
+        async function runSimulation() {
+            const layer = document.getElementById('drawLayer');
+            const stats = document.getElementById('fleetStats');
+            layer.innerHTML = ''; stats.innerHTML = '';
+            try {
+                const response = await fetch('/dispatch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employees, cars }) });
+                const result = await response.json();
+                document.getElementById('unassignedAlert').classList.toggle('hidden', result.stranded.length === 0);
+                document.getElementById('unassignedList').innerHTML = result.stranded.map(s => `<span class="bg-red-500/10 text-red-400 px-3 py-1 rounded-lg text-[9px] font-bold border border-red-500/20">${s.id}</span>`).join('');
+                
+                const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444'];
+                for(let i=0; i<result.cars.length; i++) {
+                    const car = result.cars[i]; const col = colors[i % colors.length];
+                    stats.innerHTML += `<div class="bg-white/5 p-4 rounded-2xl border border-white/5"><div class="flex justify-between text-[9px] font-black text-slate-500 uppercase mb-2"><span>${car.id}</span><span style="color: ${col}">${car.used.toFixed(1)} KM</span></div><div class="flex flex-wrap gap-1">${car.path.map(p => `<span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[8px] font-bold">${p.id}</span>`).join('')}</div></div>`;
+                    let lx = 0, ly = 0;
+                    for(let node of car.path) {
+                        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                        line.setAttribute("x1", lx); line.setAttribute("y1", -ly); line.setAttribute("x2", node.x); line.setAttribute("y2", -node.y);
+                        line.setAttribute("stroke", col); line.setAttribute("stroke-width", "1.5"); line.classList.add('route-line');
+                        layer.appendChild(line);
+
+                        const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                        dot.setAttribute("cx", node.x); dot.setAttribute("cy", -node.y); dot.setAttribute("r", "2.5"); dot.setAttribute("fill", col); dot.classList.add('node-dot');
+                        const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+                        title.textContent = `Target: ${node.id}\nCoord: [${node.x}, ${node.y}]`;
+                        dot.appendChild(title);
+                        layer.appendChild(dot);
+
+                        lx = node.x; ly = node.y;
+                        await new Promise(r => setTimeout(r, 400));
+                    }
+                }
+            } catch (e) { alert("Server unavailable. Run app.py first."); }
+        }
+    </script>
+</body>
+</html>
